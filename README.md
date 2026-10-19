@@ -84,6 +84,23 @@ prompts = [
 `feature/add-list` → `feature/category-search` → `feature/favorites` →
 `feature/crud-views` (보너스 2) → `feature/persistence-export` (보너스 1) → `docs/readme-evaluation`
 
+## 실행 화면
+
+실제 명령을 실행한 출력을 터미널 모양으로 렌더링한 이미지입니다. (입력은 파이프로 넣어서 입력한 글자는 화면에 보이지 않습니다.)
+
+| 화면 | 파일 |
+|---|---|
+| Python/Git 버전, user 설정 | [01_env.png](docs/screenshots/01_env.png) |
+| 샘플 저장소 clone | [02_clone.png](docs/screenshots/02_clone.png) |
+| 프롬프트 추가, 목록 | [03_add_list.png](docs/screenshots/03_add_list.png) |
+| 카테고리별 조회, 키워드 검색 | [04_category_search.png](docs/screenshots/04_category_search.png) |
+| 즐겨찾기 추가/해제, 상세 보기 | [05_favorites_detail.png](docs/screenshots/05_favorites_detail.png) |
+| 보너스 2: 조회수, Top, 수정, 삭제 | [06_bonus_crud_top.png](docs/screenshots/06_bonus_crud_top.png) |
+| 보너스 1: JSON 저장/복원, Markdown 내보내기 | [07_bonus_json_markdown.png](docs/screenshots/07_bonus_json_markdown.png) |
+| `git log --oneline --graph` | [08_git_log.png](docs/screenshots/08_git_log.png) |
+
+![git log graph](docs/screenshots/08_git_log.png)
+
 ## 문서
 
 - [docs/env_check.txt](docs/env_check.txt): Python/Git 버전, user.name/email
