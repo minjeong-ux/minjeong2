@@ -1,5 +1,13 @@
 """나만의 프롬프트 관리 프로그램 (콘솔)"""
 
+import json
+import os
+import re
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_FILE = os.path.join(BASE_DIR, "prompts.json")
+EXPORT_DIR = os.path.join(BASE_DIR, "exports")
+
 CATEGORIES = ["텍스트 생성", "이미지 생성", "영상 생성", "페르소나", "자동화", "기타"]
 
 DEFAULT_PROMPTS = [
@@ -37,6 +45,9 @@ MENU_ITEMS = [
     ("8", "프롬프트 수정"),
     ("9", "프롬프트 삭제"),
     ("10", "많이 본 프롬프트 Top"),
+    ("11", "JSON 파일로 저장"),
+    ("12", "JSON 파일에서 불러오기"),
+    ("13", "카테고리별 Markdown 내보내기"),
     ("0", "종료"),
 ]
 
@@ -310,6 +321,112 @@ def show_top(prompts, limit=5):
         print(f"{rank}위. (번호 {number}) [{prompt['category']}] {prompt['title']} - 조회 {prompt['views']}회")
 
 
+def normalize_prompt(raw):
+    """파일에서 읽은 항목을 프롬프트 딕셔너리로 정리한다. 형식이 잘못되면 None."""
+    if not isinstance(raw, dict):
+        return None
+    title = str(raw.get("title", "")).strip()
+    content = str(raw.get("content", "")).strip()
+    category = str(raw.get("category", "")).strip()
+    if not (title and content and category):
+        return None
+    views = raw.get("views", 0)
+    return {
+        "title": title,
+        "content": content,
+        "category": category,
+        "favorite": bool(raw.get("favorite", False)),
+        "views": views if isinstance(views, int) and views >= 0 else 0,
+    }
+
+
+def save_prompts(prompts, path=DATA_FILE):
+    """프롬프트 목록을 JSON 파일로 저장한다. 성공하면 True."""
+    try:
+        with open(path, "w", encoding="utf-8") as file:
+            json.dump(prompts, file, ensure_ascii=False, indent=2)
+    except OSError as error:
+        print(f"저장에 실패했습니다: {error}")
+        return False
+    return True
+
+
+def load_prompts(path=DATA_FILE):
+    """JSON 파일에서 프롬프트 목록을 읽는다. 파일이 없거나 깨졌으면 None."""
+    try:
+        with open(path, encoding="utf-8") as file:
+            data = json.load(file)
+    except FileNotFoundError:
+        return None
+    except (OSError, json.JSONDecodeError) as error:
+        print(f"불러오기에 실패했습니다: {error}")
+        return None
+    if not isinstance(data, list):
+        print("불러오기에 실패했습니다: 파일 형식이 올바르지 않습니다.")
+        return None
+
+    prompts = [item for item in map(normalize_prompt, data) if item is not None]
+    skipped = len(data) - len(prompts)
+    if skipped:
+        print(f"형식이 잘못된 항목 {skipped}개는 건너뛰었습니다.")
+    return prompts
+
+
+def save_to_json(prompts):
+    """메뉴: 현재 목록을 JSON 파일로 저장한다."""
+    print("\n=== JSON 저장 ===")
+    if save_prompts(prompts):
+        print(f"{len(prompts)}개의 프롬프트를 저장했습니다: {DATA_FILE}")
+
+
+def load_from_json(prompts):
+    """메뉴: JSON 파일의 내용으로 현재 목록을 교체한다."""
+    print("\n=== JSON 불러오기 ===")
+    loaded = load_prompts()
+    if loaded is None:
+        print("불러올 수 있는 저장 파일이 없습니다. 현재 목록을 유지합니다.")
+        return
+    prompts[:] = loaded  # 같은 리스트 객체를 유지한 채 내용만 교체
+    print(f"{len(prompts)}개의 프롬프트를 불러왔습니다.")
+
+
+def safe_filename(name):
+    """카테고리 이름을 파일 이름으로 쓸 수 있게 바꾼다."""
+    return re.sub(r'[\\/:*?"<>|\s]+', "_", name).strip("_") or "category"
+
+
+def export_markdown(prompts):
+    """카테고리마다 Markdown 파일 하나씩 exports/ 폴더에 내보낸다."""
+    print("\n=== Markdown 내보내기 ===")
+    if not prompts:
+        print("내보낼 프롬프트가 없습니다.")
+        return
+
+    try:
+        os.makedirs(EXPORT_DIR, exist_ok=True)
+        for category in get_all_categories(prompts):
+            items = [prompt for prompt in prompts if prompt["category"] == category]
+            if not items:
+                continue
+            lines = [f"# {category}", ""]
+            for prompt in items:
+                star = " ⭐" if prompt["favorite"] else ""
+                lines += [
+                    f"## {prompt['title']}{star}",
+                    "",
+                    f"- 조회수: {prompt['views']}",
+                    "",
+                    prompt["content"],
+                    "",
+                ]
+            path = os.path.join(EXPORT_DIR, safe_filename(category) + ".md")
+            with open(path, "w", encoding="utf-8") as file:
+                file.write("\n".join(lines))
+            print(f"{category}: {len(items)}개 -> {path}")
+    except OSError as error:
+        print(f"내보내기에 실패했습니다: {error}")
+
+
 def show_menu():
     """메인 메뉴를 출력한다."""
     print("\n=== 나만의 프롬프트 관리 ===")
@@ -318,7 +435,9 @@ def show_menu():
 
 
 def main():
-    prompts = [dict(prompt) for prompt in DEFAULT_PROMPTS]
+    prompts = load_prompts()
+    if prompts is None:
+        prompts = [dict(prompt) for prompt in DEFAULT_PROMPTS]
 
     while True:
         show_menu()
@@ -344,8 +463,15 @@ def main():
             delete_prompt(prompts)
         elif choice == "10":
             show_top(prompts)
+        elif choice == "11":
+            save_to_json(prompts)
+        elif choice == "12":
+            load_from_json(prompts)
+        elif choice == "13":
+            export_markdown(prompts)
         elif choice == "0":
-            print("프로그램을 종료합니다.")
+            save_prompts(prompts)  # 종료할 때 자동 저장
+            print("프로그램을 종료합니다. (데이터가 prompts.json에 저장되었습니다)")
             break
         else:
             print("잘못된 입력입니다. 메뉴에 있는 번호를 입력해주세요.")
