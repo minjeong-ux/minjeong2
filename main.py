@@ -8,18 +8,21 @@ DEFAULT_PROMPTS = [
         "content": "다음 회의 내용을 핵심 결정사항, 담당자, 기한으로 나눠 5줄 이내로 요약해줘.",
         "category": "텍스트 생성",
         "favorite": True,
+        "views": 0,
     },
     {
         "title": "미니멀 제품 사진",
         "content": "흰 배경 위의 무드등, 부드러운 그림자, 35mm 렌즈, 따뜻한 조명, 제품 사진 스타일",
         "category": "이미지 생성",
         "favorite": False,
+        "views": 0,
     },
     {
         "title": "시니어 코드 리뷰어",
         "content": "너는 10년차 시니어 개발자야. 코드의 버그와 가독성 문제를 짚고 개선안을 제시해줘.",
         "category": "페르소나",
         "favorite": False,
+        "views": 0,
     },
 ]
 
@@ -31,6 +34,9 @@ MENU_ITEMS = [
     ("5", "프롬프트 상세 보기"),
     ("6", "즐겨찾기 관리"),
     ("7", "즐겨찾기 목록"),
+    ("8", "프롬프트 수정"),
+    ("9", "프롬프트 삭제"),
+    ("10", "많이 본 프롬프트 Top"),
     ("0", "종료"),
 ]
 
@@ -75,6 +81,20 @@ def choose_category():
         return CATEGORIES[number - 1]
 
 
+def has_duplicate(prompts, title, category, ignore=None):
+    """같은 카테고리에 같은 제목(공백/대소문자 무시)이 이미 있는지 확인한다.
+
+    ignore: 검사에서 제외할 프롬프트 (수정 중인 자기 자신).
+    """
+    key = title.strip().lower()
+    return any(
+        prompt is not ignore
+        and prompt["category"] == category
+        and prompt["title"].strip().lower() == key
+        for prompt in prompts
+    )
+
+
 def add_prompt(prompts):
     """새 프롬프트를 입력받아 목록에 추가한다."""
     print("\n=== 프롬프트 추가 ===")
@@ -82,11 +102,16 @@ def add_prompt(prompts):
     content = input_non_empty("내용: ")
     category = choose_category()
 
+    if has_duplicate(prompts, title, category):
+        print(f"[{category}] 카테고리에 같은 제목의 프롬프트가 이미 있습니다. 추가하지 않았습니다.")
+        return
+
     prompts.append({
         "title": title,
         "content": content,
         "category": category,
         "favorite": False,
+        "views": 0,
     })
     print("프롬프트가 추가되었습니다!")
 
@@ -192,10 +217,13 @@ def show_detail(prompts):
     if prompt is None:
         return
 
+    prompt["views"] += 1
+
     line = "─" * 40
     print(line)
     print(f"제목: {prompt['title']}")
     print(f"카테고리: {prompt['category']}")
+    print(f"조회수: {prompt['views']}")
     print(f"즐겨찾기: {'⭐' if prompt['favorite'] else '-'}")
     print(line)
     print("내용:")
@@ -228,6 +256,60 @@ def show_favorites(prompts):
     print(f"총 {len(matches)}개의 즐겨찾기")
 
 
+def edit_prompt(prompts):
+    """선택한 프롬프트의 제목/내용/카테고리를 수정한다. 빈 값은 기존 값을 유지한다."""
+    print("\n=== 프롬프트 수정 ===")
+    prompt = select_prompt(prompts)
+    if prompt is None:
+        return
+
+    print("(빈 값으로 Enter 하면 기존 값을 유지합니다)")
+    title = input(f"제목 [{prompt['title']}]: ").strip() or prompt["title"]
+    content = input("내용 (비우면 유지): ").strip() or prompt["content"]
+    print(f"현재 카테고리: {prompt['category']}")
+    category = prompt["category"]
+    if input("카테고리를 변경할까요? (y/N): ").strip().lower() == "y":
+        category = choose_category()
+
+    if has_duplicate(prompts, title, category, ignore=prompt):
+        print(f"[{category}] 카테고리에 같은 제목의 프롬프트가 이미 있습니다. 수정하지 않았습니다.")
+        return
+
+    prompt["title"] = title
+    prompt["content"] = content
+    prompt["category"] = category
+    print("프롬프트가 수정되었습니다!")
+
+
+def delete_prompt(prompts):
+    """선택한 프롬프트를 확인 후 삭제한다."""
+    print("\n=== 프롬프트 삭제 ===")
+    prompt = select_prompt(prompts)
+    if prompt is None:
+        return
+
+    answer = input(f"'{prompt['title']}' 프롬프트를 삭제할까요? (y/N): ").strip().lower()
+    if answer != "y":
+        print("삭제를 취소했습니다.")
+        return
+    prompts.remove(prompt)
+    print("프롬프트가 삭제되었습니다.")
+
+
+def show_top(prompts, limit=5):
+    """조회수가 높은 순으로 상위 limit개를 출력한다 (조회수 0은 제외)."""
+    print("\n=== 많이 본 프롬프트 Top ===")
+    viewed = find_prompts(prompts, lambda prompt: prompt["views"] > 0)
+    if not viewed:
+        print("아직 조회 기록이 없습니다. (메뉴 5번 상세 보기로 조회수가 쌓입니다)")
+        return
+
+    # sorted()는 안정 정렬이라 조회수가 같으면 등록 순서가 유지된다.
+    ranked = sorted(viewed, key=lambda item: item[1]["views"], reverse=True)[:limit]
+    for rank, (number, prompt) in enumerate(ranked, start=1):
+        print(f"{rank}위. (번호 {number}) [{prompt['category']}] {prompt['title']} - 조회 {prompt['views']}회")
+
+
 def show_menu():
     """메인 메뉴를 출력한다."""
     print("\n=== 나만의 프롬프트 관리 ===")
@@ -256,6 +338,12 @@ def main():
             toggle_favorite(prompts)
         elif choice == "7":
             show_favorites(prompts)
+        elif choice == "8":
+            edit_prompt(prompts)
+        elif choice == "9":
+            delete_prompt(prompts)
+        elif choice == "10":
+            show_top(prompts)
         elif choice == "0":
             print("프로그램을 종료합니다.")
             break
