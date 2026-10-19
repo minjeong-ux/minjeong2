@@ -1,0 +1,8 @@
+__pycache__/
+*.py[cod]
+.venv/
+.DS_Store
+
+# 실행 중 생성되는 데이터/내보내기 결과
+prompts.json
+exports/

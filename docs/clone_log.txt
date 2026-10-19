@@ -1,0 +1,10 @@
+$ git clone https://github.com/sungmin-maker/native-a-1-1.git
+Cloning into '/tmp/claude-0/clone_sample'...
+$ cd native-a-1-1 && ls
+README.md
+docs
+main.py
+$ git log --oneline -3
+d2d89a4 docs: 교체된 기본 데이터로 실행 화면 스크린샷 갱신
+dfeaa86 feat: 기본 데이터를 이전 미션(Lumin 광고 영상) 실제 프롬프트 7개로 교체
+761f921 docs: 실행 화면 및 git log 스크린샷 추가
